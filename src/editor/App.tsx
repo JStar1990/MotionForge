@@ -8,6 +8,7 @@ import { usePlaybackStore } from './state/playbackStore';
 import { useUIStore } from './state/uiStore';
 import { createDefaultPose } from '../core/rig/defaultRig';
 import { ProjectFiles } from './panels/ProjectFiles';
+import { ExportImages } from './panels/ExportImages';
 import { saveCurrent, useSaveStatus } from '../persistence/session';
 
 export function App() {
@@ -19,7 +20,7 @@ export function App() {
     function shortcut(event: KeyboardEvent) {
       if (
         event.target instanceof HTMLElement &&
-        event.target.closest('input, textarea, select, [contenteditable="true"]')
+        event.target.closest('dialog, input, textarea, select, [contenteditable="true"]')
       )
         return;
       if (useUIStore.getState().previewPose || usePlaybackStore.getState().playing) return;
@@ -49,9 +50,7 @@ export function App() {
         <span className="project-name">{project.name}</span>
         <div className="top-actions">
           <ProjectFiles />
-          <button className="accent" disabled title="M4 开放图片导出">
-            导出图片 ↗
-          </button>
+          <ExportImages />
         </div>
       </header>
       <div className="workspace-toolbar">

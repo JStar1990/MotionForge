@@ -1,5 +1,6 @@
 import { Ellipse, Group, Line } from 'react-konva';
 import { describeMannequin } from '../../export/mannequin';
+import { mannequinFill } from '../../export/style';
 import { usePoseEditor } from '../state/usePoseEditor';
 import { useUIStore } from '../state/uiStore';
 
@@ -7,21 +8,10 @@ export function Mannequin() {
   const { project } = usePoseEditor();
   const { previewPose, selectBone } = useUIStore();
   const pose = previewPose ?? project.draft;
-  const near = pose.bodyTurn < 0 ? 'right' : 'left';
-  const depth = Math.sin((Math.abs(pose.bodyTurn) * Math.PI) / 180);
-  const farFill =
-    '#' +
-    [203, 209, 217]
-      .map((value, index) =>
-        Math.round(value + ([145, 155, 169][index] - value) * depth)
-          .toString(16)
-          .padStart(2, '0'),
-      )
-      .join('');
   return (
     <Group>
       {describeMannequin(project.rig, pose).map((part, index) => {
-        const fill = part.side === 'center' ? '#b8bec8' : part.side === near ? '#cbd1d9' : farFill;
+        const fill = mannequinFill(part, pose);
         return (
           <Group
             key={`${part.boneId}-${index}`}
