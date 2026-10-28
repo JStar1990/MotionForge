@@ -107,3 +107,35 @@ test('骨架辅助、世界轴切换和关节聚焦不改变截图或姿势', as
   await expect(page.getByRole('status')).toContainText('模型已加载');
   await expect(page.getByLabel('旋转轴空间')).toHaveValue('local');
 });
+
+test('手脚 IK 平移控件', async ({ page }, info) => {
+  await page.goto('/');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  await page.getByRole('button', { name: '正面', exact: true }).click();
+  await page.getByLabel('选择 3D 骨骼').selectOption('hand_l');
+  await page.getByLabel('骨骼操作模式').selectOption('translate');
+  await expect(page.getByTestId('bone-feedback')).toContainText('拖动箭头');
+  const capture = page.getByTestId('capture-view').locator('canvas');
+  const before = await capture.screenshot();
+  await page.mouse.move(760, 422);
+  await page.mouse.down();
+  await page.mouse.move(670, 422, { steps: 12 });
+  await page.mouse.up();
+  await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeEnabled();
+  await expect(async () => expect(await capture.screenshot()).not.toEqual(before)).toPass();
+  await page.screenshot({ path: info.outputPath('ik.png') });
+  await page.getByRole('button', { name: '撤销姿势', exact: true }).click();
+  await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
+  await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeDisabled();
+  await page.mouse.move(760, 422);
+  await page.mouse.down();
+  await page.mouse.move(670, 422, { steps: 12 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
+  await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '重做姿势', exact: true }).click();
+  await expect(async () => expect(await capture.screenshot()).not.toEqual(before)).toPass();
+  await page.getByLabel('选择 3D 骨骼').selectOption('spine_01');
+  await expect(page.getByTestId('bone-feedback')).toContainText('请选择');
+});

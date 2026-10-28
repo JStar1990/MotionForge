@@ -74,6 +74,8 @@ function Angle({
   );
 }
 export function PoseControls({ rig }: { rig: BoneRig }) {
+  const [mode, setMode] = useState<'rotate' | 'translate'>('rotate');
+  const [feedback, setFeedback] = useState('');
   const [selected, select] = useState('upperarm_l');
   const [space, setSpace] = useState<'local' | 'world'>('local');
   const [showBones, setShowBones] = useState(true);
@@ -93,7 +95,7 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
   useEffect(() => {
     const interaction = rig.interaction;
     if (!interaction) return;
-    interaction.bind(select, (name, delta) => commit({ ...pose, [name]: delta }));
+    interaction.bind(select, (changes) => commit({ ...pose, ...changes }), setFeedback);
     return () => {
       interaction.bind();
     };
@@ -107,13 +109,28 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
   useEffect(() => {
     rig.interaction?.setSpace(space);
   }, [rig, space]);
+  useEffect(() => {
+    rig.interaction?.setMode(mode);
+  }, [rig, mode]);
   const rotation = new THREE.Euler().setFromQuaternion(
     new THREE.Quaternion(...(pose[selected] ?? [0, 0, 0, 1])),
     'XYZ',
   );
   return (
     <section className="fk-controls">
-      <h3>骨骼姿势 · FK</h3>
+      <h3>骨骼姿势 · FK / IK</h3>
+      <label>
+        操作模式{' '}
+        <select
+          aria-label="骨骼操作模式"
+          value={mode}
+          onChange={(event) => setMode(event.target.value as 'rotate' | 'translate')}
+        >
+          <option value="rotate">旋转骨骼（FK）</option>
+          <option value="translate">平移手脚（IK）</option>
+        </select>
+      </label>
+      <p data-testid="bone-feedback">{feedback}</p>
       <label>
         <input
           type="checkbox"
@@ -123,13 +140,15 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
         显示骨骼控制点
       </label>
       <p>
-        点击自由视图中的关节点，再拖动彩色旋转环摆姿势。Esc 取消本次拖动；空白处拖动可环绕观察。
+        旋转模式拖动彩色旋转环；平移模式选手或脚，拖动箭头或方块。Esc
+        取消本次拖动，空白处拖动可环绕观察。
       </p>
       <p>重叠关节点可按住 Alt 点击轮换选择，骨架连线可透过素体查看。</p>
       <label>
         旋转轴{' '}
         <select
           aria-label="旋转轴空间"
+          disabled={mode === 'translate'}
           value={space}
           onChange={(event) => setSpace(event.target.value as 'local' | 'world')}
         >
@@ -193,7 +212,8 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
         <button onClick={() => commit({})}>重置 3D 姿势</button>
       </div>
       <p className="warning">
-        姿势暂不保存；刷新、切换素体或返回 2D 将清除本次 3D 编辑。IK 和关节限制尚未接入。
+        姿势暂不保存；刷新、切换素体或返回 2D 将清除本次 3D 编辑。手脚平移已接入基础
+        IK；关节限制、肘膝方向控件与整人平移尚未接入。
       </p>
     </section>
   );
