@@ -75,6 +75,7 @@ function Angle({
 }
 export function PoseControls({ rig }: { rig: BoneRig }) {
   const [selected, select] = useState('upperarm_l');
+  const [space, setSpace] = useState<'local' | 'world'>('local');
   const [showBones, setShowBones] = useState(true);
   const [pose, setPose] = useState<Pose>({});
   const [past, setPast] = useState<Pose[]>([]);
@@ -103,6 +104,9 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
   useEffect(() => {
     rig.interaction?.setVisible(showBones);
   }, [rig, showBones]);
+  useEffect(() => {
+    rig.interaction?.setSpace(space);
+  }, [rig, space]);
   const rotation = new THREE.Euler().setFromQuaternion(
     new THREE.Quaternion(...(pose[selected] ?? [0, 0, 0, 1])),
     'XYZ',
@@ -121,6 +125,19 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
       <p>
         点击自由视图中的关节点，再拖动彩色旋转环摆姿势。Esc 取消本次拖动；空白处拖动可环绕观察。
       </p>
+      <p>重叠关节点可按住 Alt 点击轮换选择，骨架连线可透过素体查看。</p>
+      <label>
+        旋转轴{' '}
+        <select
+          aria-label="旋转轴空间"
+          value={space}
+          onChange={(event) => setSpace(event.target.value as 'local' | 'world')}
+        >
+          <option value="local">局部轴（随骨骼）</option>
+          <option value="world">世界轴（固定方向）</option>
+        </select>
+      </label>
+      <button onClick={() => rig.interaction?.focus()}>聚焦选中骨骼</button>
       <p>相对绑定姿态的局部 XYZ 旋转（度）。按 Enter 或移开焦点提交。</p>
       <select
         aria-label="选择 3D 骨骼"

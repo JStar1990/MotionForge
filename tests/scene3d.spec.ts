@@ -84,3 +84,26 @@ test('视图骨骼旋转、一次撤销、Esc 取消与辅助层隔离', async (
   await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
   await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeDisabled();
 });
+
+test('骨架辅助、世界轴切换和关节聚焦不改变截图或姿势', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  const capture = page.getByTestId('capture-view').locator('canvas');
+  const free = page.getByTestId('free-view').locator('canvas');
+  const outputBefore = await capture.screenshot();
+  await page.getByLabel('旋转轴空间').selectOption('world');
+  await expect(page.getByLabel('旋转轴空间')).toHaveValue('world');
+  await page.getByLabel('选择 3D 骨骼').selectOption('foot_l');
+  const freeBefore = await free.screenshot();
+  await page.getByRole('button', { name: '聚焦选中骨骼' }).click();
+  await expect(async () => expect(await free.screenshot()).not.toEqual(freeBefore)).toPass();
+  await expect(async () => expect(await capture.screenshot()).toEqual(outputBefore)).toPass();
+  await page.getByLabel('显示骨骼控制点').uncheck();
+  await expect(async () => expect(await capture.screenshot()).toEqual(outputBefore)).toPass();
+  await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeDisabled();
+  await page.getByLabel('旋转轴空间').selectOption('local');
+  await page.getByLabel('显示骨骼控制点').check();
+  await page.getByLabel('素体模型').selectOption('female');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  await expect(page.getByLabel('旋转轴空间')).toHaveValue('local');
+});

@@ -9,6 +9,16 @@ export class BoneInteraction {
   private transform: TransformControls;
   private markers: THREE.Mesh[] = [];
   private selected = '';
+  private links: Array<[THREE.Bone, THREE.Bone]> = [];
+  private lines = new THREE.LineSegments(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({
+      color: 0x57d6ff,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.6,
+    }),
+  );
   private before: THREE.Quaternion | null = null;
   private cancelled = false;
   onSelect?: (name: string) => void;
@@ -35,6 +45,18 @@ export class BoneInteraction {
       this.markers.push(marker);
       this.overlay.add(marker);
     }
+    for (const marker of this.markers) {
+      const bone = rig.bones.get(marker.name)!;
+      let parent = bone.parent;
+      while (parent && !boneLabels[parent.name]) parent = parent.parent;
+      if (parent && (parent as THREE.Bone).isBone) this.links.push([bone, parent as THREE.Bone]);
+    }
+    this.lines.geometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(new Float32Array(this.links.length * 6), 3),
+    );
+    this.lines.renderOrder = 999;
+    this.overlay.add(this.lines);
     this.transform.addEventListener('mouseDown', () => {
       this.before = this.rig.bones.get(this.selected)!.quaternion.clone();
       this.cancelled = false;
@@ -80,11 +102,32 @@ export class BoneInteraction {
         marker.name === name ? 0xffc857 : 0x57d6ff,
       );
   }
+  setSpace(space: 'local' | 'world') {
+    if (!this.transform.dragging) this.transform.setSpace(space);
+  }
+  focus() {
+    if (this.transform.dragging) return;
+    const target = this.rig.bones.get(this.selected)!.getWorldPosition(new THREE.Vector3());
+    const offset = this.transform.camera.position.clone().sub(this.orbit.target);
+    this.orbit.target.copy(target);
+    this.transform.camera.position.copy(target).add(offset);
+    this.orbit.update();
+  }
   setVisible(visible: boolean) {
     this.overlay.visible = visible;
     this.transform.enabled = visible;
   }
   update() {
+    const positions = this.lines.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const point = new THREE.Vector3();
+    this.links.forEach(([bone, parent], index) => {
+      bone.getWorldPosition(point);
+      positions.setXYZ(index * 2, point.x, point.y, point.z);
+      parent.getWorldPosition(point);
+      positions.setXYZ(index * 2 + 1, point.x, point.y, point.z);
+    });
+    positions.needsUpdate = true;
+    this.lines.geometry.computeBoundingSphere();
     for (const marker of this.markers)
       this.rig.bones.get(marker.name)!.getWorldPosition(marker.position);
   }
@@ -105,8 +148,12 @@ export class BoneInteraction {
       y: (-(event.clientY - rect.top) / rect.height) * 2 + 1,
       button: event.button,
     } as PointerEvent);
-    if (this.transform.axis) return;
-    const hit = ray.intersectObjects(this.markers, false)[0];
+    if (this.transform.axis && !event.altKey) return;
+    const hits = ray
+      .intersectObjects(this.markers, false)
+      .filter((hit, index, all) => all.findIndex((other) => other.object === hit.object) === index);
+    const currentIndex = hits.findIndex((hit) => hit.object.name === this.selected);
+    const hit = hits[event.altKey ? (currentIndex + 1) % hits.length : 0];
     if (hit) {
       this.select(hit.object.name);
       this.onSelect?.(hit.object.name);
@@ -124,6 +171,8 @@ export class BoneInteraction {
     window.removeEventListener('keydown', this.key);
     this.transform.dispose();
     this.overlay.removeFromParent();
+    this.lines.geometry.dispose();
+    this.lines.material.dispose();
     for (const marker of this.markers) {
       marker.geometry.dispose();
       (marker.material as THREE.Material).dispose();
