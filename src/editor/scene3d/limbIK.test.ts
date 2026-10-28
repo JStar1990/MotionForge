@@ -69,3 +69,24 @@ describe.each(['male', 'female'])('IK on shipped %s skeleton', (model) => {
     });
   }
 });
+
+it('pole changes bend direction while preserving endpoint and orientation', () => {
+  const root = new THREE.Group(),
+    upper = new THREE.Bone(),
+    lower = new THREE.Bone(),
+    end = new THREE.Bone();
+  root.add(upper);
+  upper.add(lower);
+  lower.add(end);
+  lower.position.x = 1;
+  end.position.x = 1;
+  const target = new THREE.Vector3(1.2, 0, 0);
+  const orientation = end.getWorldQuaternion(new THREE.Quaternion());
+  solveLimb(upper, lower, end, target, new THREE.Vector3(0, 1, 0));
+  expect(lower.getWorldPosition(new THREE.Vector3()).y).toBeGreaterThan(0.7);
+  expect(end.getWorldPosition(new THREE.Vector3()).distanceTo(target)).toBeLessThan(1e-6);
+  solveLimb(upper, lower, end, target, new THREE.Vector3(0, -1, 0));
+  expect(lower.getWorldPosition(new THREE.Vector3()).y).toBeLessThan(-0.7);
+  expect(end.getWorldPosition(new THREE.Vector3()).distanceTo(target)).toBeLessThan(1e-6);
+  expect(end.getWorldQuaternion(new THREE.Quaternion()).angleTo(orientation)).toBeLessThan(1e-6);
+});

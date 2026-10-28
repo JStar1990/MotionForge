@@ -74,7 +74,7 @@ function Angle({
   );
 }
 export function PoseControls({ rig }: { rig: BoneRig }) {
-  const [mode, setMode] = useState<'rotate' | 'translate'>('rotate');
+  const [mode, setMode] = useState<'rotate' | 'translate' | 'pole'>('rotate');
   const [feedback, setFeedback] = useState('');
   const [selected, select] = useState('upperarm_l');
   const [space, setSpace] = useState<'local' | 'world'>('local');
@@ -124,10 +124,11 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
         <select
           aria-label="骨骼操作模式"
           value={mode}
-          onChange={(event) => setMode(event.target.value as 'rotate' | 'translate')}
+          onChange={(event) => setMode(event.target.value as 'rotate' | 'translate' | 'pole')}
         >
           <option value="rotate">旋转骨骼（FK）</option>
           <option value="translate">平移手脚（IK）</option>
+          <option value="pole">调整肘膝方向</option>
         </select>
       </label>
       <p data-testid="bone-feedback">{feedback}</p>
@@ -148,7 +149,7 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
         旋转轴{' '}
         <select
           aria-label="旋转轴空间"
-          disabled={mode === 'translate'}
+          disabled={mode !== 'rotate'}
           value={space}
           onChange={(event) => setSpace(event.target.value as 'local' | 'world')}
         >
@@ -213,7 +214,7 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
       </div>
       <p className="warning">
         姿势暂不保存；刷新、切换素体或返回 2D 将清除本次 3D 编辑。手脚平移已接入基础
-        IK；关节限制、肘膝方向控件与整人平移尚未接入。
+        IK；支持肘膝方向调整；关节限制与整人平移尚未接入。
       </p>
     </section>
   );

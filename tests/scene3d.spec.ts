@@ -139,3 +139,36 @@ test('手脚 IK 平移控件', async ({ page }, info) => {
   await page.getByLabel('选择 3D 骨骼').selectOption('spine_01');
   await expect(page.getByTestId('bone-feedback')).toContainText('请选择');
 });
+
+test('肘膝方向控件', async ({ page }, info) => {
+  await page.goto('/');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  await page.getByRole('button', { name: '正面', exact: true }).click();
+  await page.getByLabel('选择 3D 骨骼').selectOption('hand_l');
+  await page.getByLabel('骨骼操作模式').selectOption('translate');
+  await page.mouse.move(760, 422);
+  await page.mouse.down();
+  await page.mouse.move(670, 422, { steps: 12 });
+  await page.mouse.up();
+  const capture = page.getByTestId('capture-view').locator('canvas');
+  const bent = await capture.screenshot();
+  await page.getByLabel('骨骼操作模式').selectOption('pole');
+  await expect(page.getByTestId('bone-feedback')).toContainText('橙色');
+  await expect(async () => expect(await capture.screenshot()).toEqual(bent)).toPass();
+  await page.mouse.move(580, 390);
+  await page.mouse.down();
+  await page.mouse.move(580, 280, { steps: 12 });
+  await page.mouse.up();
+  await expect(async () => expect(await capture.screenshot()).not.toEqual(bent)).toPass();
+  await page.screenshot({ path: info.outputPath('pole.png') });
+  await page.getByRole('button', { name: '撤销姿势', exact: true }).click();
+  await expect(async () => expect(await capture.screenshot()).toEqual(bent)).toPass();
+  await page.mouse.move(580, 390);
+  await page.mouse.down();
+  await page.mouse.move(580, 280, { steps: 12 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(async () => expect(await capture.screenshot()).toEqual(bent)).toPass();
+  await page.getByRole('button', { name: '重做姿势', exact: true }).click();
+  await expect(async () => expect(await capture.screenshot()).not.toEqual(bent)).toPass();
+});

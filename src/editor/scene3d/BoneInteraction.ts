@@ -21,10 +21,15 @@ export class BoneInteraction {
     }),
   );
   private before: Map<string, THREE.Quaternion> | null = null;
-  private mode: 'rotate' | 'translate' = 'rotate';
+  private mode: 'rotate' | 'translate' | 'pole' = 'rotate';
   private space: 'local' | 'world' = 'local';
   private target = new THREE.Object3D();
   private pole = new THREE.Vector3();
+  private goal = new THREE.Vector3();
+  private poleMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.025, 12, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffb55e, depthTest: false }),
+  );
   onFeedback?: (message: string) => void;
   private cancelled = false;
   onSelect?: (name: string) => void;
@@ -39,7 +44,8 @@ export class BoneInteraction {
     this.transform.setMode('rotate');
     this.transform.setSpace('local');
     this.transform.setSize(0.7);
-    this.overlay.add(this.transform.getHelper(), this.target);
+    this.overlay.add(this.transform.getHelper(), this.target, this.poleMarker);
+    this.poleMarker.renderOrder = 1001;
     for (const name of rig.bones.keys()) {
       if (!boneLabels[name]) continue;
       const marker = new THREE.Mesh(
@@ -68,22 +74,38 @@ export class BoneInteraction {
         [...this.rig.bones].map(([name, bone]) => [name, bone.quaternion.clone()]),
       );
       const chain = this.chain();
-      if (this.mode === 'translate' && chain) this.pole.copy(initialPole(...chain));
+      if (chain) {
+        this.pole.copy(initialPole(...chain));
+        chain[2].getWorldPosition(this.goal);
+      }
       this.cancelled = false;
       this.orbit.enabled = false;
     });
     this.transform.addEventListener('objectChange', () => {
       if (!this.before) return;
-      if (this.mode === 'translate' || this.cancelled) this.restore();
+      if (this.mode !== 'rotate' || this.cancelled) this.restore();
       if (this.cancelled) return;
-      if (this.mode === 'translate') {
+      if (this.mode !== 'rotate') {
         const chain = this.chain();
         if (chain) {
-          const error = solveLimb(...chain, this.target.position, this.pole);
+          if (this.mode === 'pole') {
+            const origin = chain[0].getWorldPosition(new THREE.Vector3());
+            const axis = this.goal.clone().sub(origin).normalize();
+            const offset = this.target.position.clone().sub(origin);
+            if (offset.addScaledVector(axis, -offset.dot(axis)).lengthSq() > 1e-6)
+              this.pole.copy(this.target.position);
+          }
+          const error = solveLimb(
+            ...chain,
+            this.mode === 'pole' ? this.goal : this.target.position,
+            this.pole,
+          );
           this.onFeedback?.(
             error > 0.005
               ? '目标超出可达范围，已保持骨长并停在可达位置。'
-              : '拖动手脚目标：四肢跟随，骨长保持不变。',
+              : this.mode === 'pole'
+                ? '正在调整肘膝弯曲方向，手脚位置保持。'
+                : '拖动手脚目标：四肢跟随，骨长保持不变。',
           );
         }
       }
@@ -140,10 +162,9 @@ export class BoneInteraction {
   }
   setSpace(space: 'local' | 'world') {
     this.space = space;
-    if (!this.transform.dragging)
-      this.transform.setSpace(this.mode === 'translate' ? 'world' : space);
+    if (!this.transform.dragging) this.transform.setSpace(this.mode !== 'rotate' ? 'world' : space);
   }
-  setMode(mode: 'rotate' | 'translate') {
+  setMode(mode: 'rotate' | 'translate' | 'pole') {
     if (this.transform.dragging) return;
     this.mode = mode;
     this.attach();
@@ -159,24 +180,28 @@ export class BoneInteraction {
       : null;
   }
   private syncTarget() {
-    this.rig.bones.get(this.selected)?.getWorldPosition(this.target.position);
+    const chain = this.chain();
+    if (this.mode === 'pole' && chain) this.target.position.copy(initialPole(...chain));
+    else this.rig.bones.get(this.selected)?.getWorldPosition(this.target.position);
     this.target.updateMatrixWorld(true);
   }
   private attach() {
     this.syncTarget();
-    this.transform.setMode(this.mode);
-    this.transform.setSpace(this.mode === 'translate' ? 'world' : this.space);
-    if (this.mode === 'translate' && !this.chain()) {
+    this.transform.setMode(this.mode === 'rotate' ? 'rotate' : 'translate');
+    this.transform.setSpace(this.mode !== 'rotate' ? 'world' : this.space);
+    if (this.mode !== 'rotate' && !this.chain()) {
       this.transform.detach();
-      this.onFeedback?.('平移模式请选择左手、右手、左脚或右脚。');
+      this.onFeedback?.('手脚控制模式请选择左手、右手、左脚或右脚。');
     } else {
       this.transform.attach(
-        this.mode === 'translate' ? this.target : this.rig.bones.get(this.selected)!,
+        this.mode !== 'rotate' ? this.target : this.rig.bones.get(this.selected)!,
       );
       this.onFeedback?.(
-        this.mode === 'translate'
-          ? '拖动箭头或平面方块移动手脚；中心方块沿视平面移动。'
-          : '拖动旋转环调整骨骼。',
+        this.mode === 'pole'
+          ? '拖动橙色方向点的箭头调整肘膝朝向；先弯曲肢体更易观察。'
+          : this.mode === 'translate'
+            ? '拖动箭头或平面方块移动手脚；中心方块沿视平面移动。'
+            : '拖动旋转环调整骨骼。',
       );
     }
   }
@@ -198,6 +223,8 @@ export class BoneInteraction {
   }
   update() {
     if (!this.transform.dragging) this.syncTarget();
+    this.poleMarker.visible = this.mode === 'pole' && !!this.chain();
+    this.poleMarker.position.copy(this.target.position);
     const positions = this.lines.geometry.getAttribute('position') as THREE.BufferAttribute;
     const point = new THREE.Vector3();
     this.links.forEach(([bone, parent], index) => {
@@ -253,6 +280,8 @@ export class BoneInteraction {
     window.removeEventListener('keydown', this.key);
     this.transform.dispose();
     this.overlay.removeFromParent();
+    this.poleMarker.geometry.dispose();
+    this.poleMarker.material.dispose();
     this.lines.geometry.dispose();
     this.lines.material.dispose();
     for (const marker of this.markers) {
