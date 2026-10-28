@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { PoseControls, type BoneRig } from './PoseControls';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -8,12 +9,20 @@ type CameraState = {
   target: [number, number, number];
   perspective: boolean;
   size: number;
+  fov: number;
+  near: number;
+  far: number;
+  aspect: number;
 };
 const initial: CameraState = {
   position: [0, 1, 4],
   target: [0, 1, 0],
   perspective: false,
   size: 2.4,
+  fov: 40,
+  near: 0.01,
+  far: 100,
+  aspect: 1,
 };
 type Runtime = {
   apply: (state: CameraState) => void;
@@ -31,6 +40,7 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
   const [locked, setLocked] = useState(true);
   const [status, setStatus] = useState('正在加载 3D 素体…');
   const [model, setModel] = useState('male');
+  const [rig, setRig] = useState<BoneRig | null>(null);
   const current = useRef(camera);
   function commit(next: CameraState) {
     if (JSON.stringify(next) === JSON.stringify(current.current)) return;
@@ -94,10 +104,11 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
     scene.add(helper);
     function end() {
       commitRef.current({
+        ...current.current,
         position: capture.position.toArray() as CameraState['position'],
         target: captureControls.target.toArray() as CameraState['target'],
         perspective: capture === perspective,
-        size: current.current.size,
+        size: current.current.size / (capture === ortho ? ortho.zoom : 1),
       });
     }
     captureControls.addEventListener('end', end);
@@ -115,8 +126,18 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
         helper = new THREE.CameraHelper(next);
         scene.add(helper);
       }
-      ortho.left = ortho.bottom = -state.size / 2;
-      ortho.right = ortho.top = state.size / 2;
+      ortho.zoom = 1;
+      ortho.left = (-state.size * state.aspect) / 2;
+      ortho.right = (state.size * state.aspect) / 2;
+      ortho.bottom = -state.size / 2;
+      ortho.top = state.size / 2;
+      ortho.near = perspective.near = state.near;
+      ortho.far = perspective.far = state.far;
+      perspective.fov = state.fov;
+      perspective.aspect = state.aspect;
+      perspective.updateProjectionMatrix();
+      captureRenderer.setSize(512, Math.round(512 / state.aspect));
+      output.style.aspectRatio = String(state.aspect);
       ortho.updateProjectionMatrix();
       capture.position.fromArray(state.position);
       captureControls.target.fromArray(state.target);
@@ -129,10 +150,11 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
         captureControls.enabled = value;
       },
       copy: () => ({
+        ...current.current,
         position: free.position.toArray() as CameraState['position'],
         target: controls.target.toArray() as CameraState['target'],
         perspective: true,
-        size: current.current.size,
+        size: current.current.size / (capture === ortho ? ortho.zoom : 1),
       }),
       view: (name) => {
         const positions: Record<string, number[]> = {
@@ -179,11 +201,17 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
         group.add(gltf.scene);
         group.position.y = -box.min.y;
         scene.add(group);
+        const loaded: BoneRig = { bones: new Map(), rest: new Map() };
         let joints = 0;
         gltf.scene.traverse((node) => {
-          if ((node as THREE.Bone).isBone) joints++;
+          if ((node as THREE.Bone).isBone) {
+            joints++;
+            loaded.bones.set(node.name, node as THREE.Bone);
+            loaded.rest.set(node.name, node.quaternion.clone());
+          }
         });
-        setStatus(`模型已加载 · ${joints} 个骨骼节点 · 静止姿态预览`);
+        setRig(loaded);
+        setStatus(`模型已加载 · ${joints} 个骨骼节点 · FK 姿势编辑`);
       },
       undefined,
       () => {
@@ -233,6 +261,7 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
             value={model}
             onChange={(event) => {
               setLocked(true);
+              setRig(null);
               setStatus('正在加载 3D 素体…');
               setModel(event.target.value);
             }}
@@ -281,6 +310,49 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
           </button>
           <fieldset disabled={locked}>
             <label>
+              画面比例{' '}
+              <select
+                aria-label="截图比例"
+                value={camera.aspect}
+                onChange={(event) => commit({ ...camera, aspect: Number(event.target.value) })}
+              >
+                <option value={1}>1:1</option>
+                <option value={16 / 9}>16:9</option>
+                <option value={9 / 16}>9:16</option>
+              </select>
+            </label>
+            {(
+              [
+                ['fov', '透视视野', 10, 120],
+                ['near', '近裁剪面', 0.001, 10],
+                ['far', '远裁剪面', 1, 1000],
+              ] as const
+            ).map(([field, label, min, max]) => (
+              <label key={field}>
+                {label}
+                <input
+                  aria-label={label}
+                  type="number"
+                  step={field === 'fov' ? 1 : 0.01}
+                  value={camera[field]}
+                  min={min}
+                  max={max}
+                  onChange={(event) => {
+                    if (!event.target.value) return;
+                    const value = Number(event.target.value);
+                    const next = { ...camera, [field]: value };
+                    if (
+                      Number.isFinite(value) &&
+                      value >= min &&
+                      value <= max &&
+                      next.far > next.near
+                    )
+                      commit(next);
+                  }}
+                />
+              </label>
+            ))}
+            <label>
               投影{' '}
               <select
                 aria-label="截图投影"
@@ -290,7 +362,7 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
                 }
               >
                 <option value="orthographic">正交</option>
-                <option value="perspective">透视（40°）</option>
+                <option value="perspective">透视</option>
               </select>
             </label>
             {(['position', 'target'] as const).map((field) => (
@@ -341,10 +413,8 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
               </label>
             )}
           </fieldset>
-          <p>
-            截图视图独立于自由摄像机，固定 1:1
-            构图。当前为静止素体预览；姿势编辑、工程保存与正式截图导出将在后续接入。
-          </p>
+          <p>截图视图独立于自由摄像机；相机与姿势均为临时编辑，尚未接入 3D 工程保存或截图下载。</p>
+          {rig && <PoseControls key={model} rig={rig} />}
         </aside>
       </div>
       <footer className="statusbar" role="status">

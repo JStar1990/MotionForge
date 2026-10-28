@@ -22,3 +22,34 @@ test('3D 模型、双机隔离、解锁与撤销', async ({ page }, info) => {
   await expect(page.getByTestId('pose-canvas')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('3D FK 编辑、撤销重做、相机比例与裁剪验证', async ({ page }, info) => {
+  await page.goto('/');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  const capture = page.getByTestId('capture-view').locator('canvas');
+  const before = await capture.screenshot();
+  const rotation = page.getByLabel('骨骼旋转 X', { exact: true });
+  await rotation.fill('70');
+  await rotation.press('Enter');
+  await expect(rotation).toHaveValue('70');
+  await expect(async () => expect(await capture.screenshot()).not.toEqual(before)).toPass();
+  await page.getByRole('button', { name: '撤销姿势', exact: true }).click();
+  await expect(rotation).toHaveValue('0');
+  await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
+  await page.getByRole('button', { name: '重做姿势', exact: true }).click();
+  await expect(rotation).toHaveValue('70');
+  await page.getByLabel('选择 3D 骨骼').selectOption('upperarm_r');
+  await rotation.fill('-70');
+  await rotation.press('Enter');
+  await page.getByRole('button', { name: '解锁截图摄像机' }).click();
+  await page.getByLabel('截图比例').selectOption(String(16 / 9));
+  await expect(capture).toHaveAttribute('height', '288');
+  await page.getByLabel('截图投影').selectOption('perspective');
+  await page.getByLabel('透视视野').fill('60');
+  await expect(page.getByLabel('透视视野')).toHaveValue('60');
+  await page.getByLabel('近裁剪面').fill('200');
+  await expect(page.getByLabel('近裁剪面')).toHaveValue('0.01');
+  await page.screenshot({ path: info.outputPath('fk-camera.png'), fullPage: true });
+  await page.getByRole('button', { name: '重置 3D 姿势' }).click();
+  await expect(rotation).toHaveValue('0');
+});
