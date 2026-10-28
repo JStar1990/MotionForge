@@ -1,3 +1,4 @@
+import { BoneInteraction } from './BoneInteraction';
 import { useEffect, useRef, useState } from 'react';
 import { PoseControls, type BoneRig } from './PoseControls';
 import * as THREE from 'three';
@@ -61,6 +62,7 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
     const host = freeHost.current!;
     const output = captureHost.current!;
     let disposed = false;
+    let boneInteraction: BoneInteraction | undefined;
     let request = 0;
     let freeRenderer!: THREE.WebGLRenderer;
     let captureRenderer: THREE.WebGLRenderer;
@@ -210,6 +212,9 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
             loaded.rest.set(node.name, node.quaternion.clone());
           }
         });
+        boneInteraction = new BoneInteraction(loaded, free, freeRenderer.domElement, controls);
+        loaded.interaction = boneInteraction;
+        scene.add(boneInteraction.overlay);
         setRig(loaded);
         setStatus(`模型已加载 · ${joints} 个骨骼节点 · FK 姿势编辑`);
       },
@@ -222,10 +227,14 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
       helper.visible = true;
       grid.visible = true;
       helper.update();
+      boneInteraction?.update();
       freeRenderer.render(scene, free);
       helper.visible = false;
       grid.visible = false;
+      const bonesVisible = boneInteraction?.overlay.visible;
+      if (boneInteraction) boneInteraction.overlay.visible = false;
       captureRenderer.render(scene, capture);
+      if (boneInteraction) boneInteraction.overlay.visible = bonesVisible ?? true;
       request = requestAnimationFrame(render);
     }
     render();
@@ -233,6 +242,7 @@ export function Scene3D({ onLegacy }: { onLegacy: () => void }) {
       disposed = true;
       cancelAnimationFrame(request);
       resize.disconnect();
+      boneInteraction?.dispose();
       controls.dispose();
       captureControls.dispose();
       helper.dispose();

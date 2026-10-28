@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as THREE from 'three';
 
-export type BoneRig = { bones: Map<string, THREE.Bone>; rest: Map<string, THREE.Quaternion> };
+import type { BoneInteraction } from './BoneInteraction';
+export type BoneRig = {
+  bones: Map<string, THREE.Bone>;
+  rest: Map<string, THREE.Quaternion>;
+  interaction?: BoneInteraction;
+};
 type Pose = Record<string, [number, number, number, number]>;
-const labels: Record<string, string> = {
+export const boneLabels: Record<string, string> = {
   pelvis: '骨盆',
   spine_01: '下脊柱',
   spine_02: '中脊柱',
@@ -70,16 +75,34 @@ function Angle({
 }
 export function PoseControls({ rig }: { rig: BoneRig }) {
   const [selected, select] = useState('upperarm_l');
+  const [showBones, setShowBones] = useState(true);
   const [pose, setPose] = useState<Pose>({});
   const [past, setPast] = useState<Pose[]>([]);
   const [future, setFuture] = useState<Pose[]>([]);
-  function commit(next: Pose) {
-    if (JSON.stringify(next) === JSON.stringify(pose)) return;
-    setPast([...past, structuredClone(pose)].slice(-100));
-    setFuture([]);
-    setPose(next);
-    applyPose(rig, next);
-  }
+  const commit = useCallback(
+    (next: Pose) => {
+      if (JSON.stringify(next) === JSON.stringify(pose)) return;
+      setPast([...past, structuredClone(pose)].slice(-100));
+      setFuture([]);
+      setPose(next);
+      applyPose(rig, next);
+    },
+    [past, pose, rig],
+  );
+  useEffect(() => {
+    const interaction = rig.interaction;
+    if (!interaction) return;
+    interaction.bind(select, (name, delta) => commit({ ...pose, [name]: delta }));
+    return () => {
+      interaction.bind();
+    };
+  }, [rig, commit, pose]);
+  useEffect(() => {
+    rig.interaction?.select(selected);
+  }, [rig, selected]);
+  useEffect(() => {
+    rig.interaction?.setVisible(showBones);
+  }, [rig, showBones]);
   const rotation = new THREE.Euler().setFromQuaternion(
     new THREE.Quaternion(...(pose[selected] ?? [0, 0, 0, 1])),
     'XYZ',
@@ -87,6 +110,17 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
   return (
     <section className="fk-controls">
       <h3>骨骼姿势 · FK</h3>
+      <label>
+        <input
+          type="checkbox"
+          checked={showBones}
+          onChange={(event) => setShowBones(event.target.checked)}
+        />
+        显示骨骼控制点
+      </label>
+      <p>
+        点击自由视图中的关节点，再拖动彩色旋转环摆姿势。Esc 取消本次拖动；空白处拖动可环绕观察。
+      </p>
       <p>相对绑定姿态的局部 XYZ 旋转（度）。按 Enter 或移开焦点提交。</p>
       <select
         aria-label="选择 3D 骨骼"
@@ -94,10 +128,10 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
         onChange={(event) => select(event.target.value)}
       >
         {[...rig.bones.keys()]
-          .filter((name) => labels[name])
+          .filter((name) => boneLabels[name])
           .map((name) => (
             <option key={name} value={name}>
-              {labels[name]}
+              {boneLabels[name]}
             </option>
           ))}
       </select>

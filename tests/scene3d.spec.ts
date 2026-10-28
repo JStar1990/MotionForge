@@ -53,3 +53,34 @@ test('3D FK 编辑、撤销重做、相机比例与裁剪验证', async ({ page 
   await page.getByRole('button', { name: '重置 3D 姿势' }).click();
   await expect(rotation).toHaveValue('0');
 });
+
+test('视图骨骼旋转、一次撤销、Esc 取消与辅助层隔离', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  await page.getByRole('button', { name: '左侧', exact: true }).click();
+  const capture = page.getByTestId('capture-view').locator('canvas');
+  const before = await capture.screenshot();
+  await page.getByLabel('显示骨骼控制点').uncheck();
+  await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
+  await page.getByLabel('显示骨骼控制点').check();
+  await page.mouse.click(558, 792);
+  await expect(page.getByLabel('选择 3D 骨骼')).not.toHaveValue('upperarm_l');
+  await page.getByLabel('选择 3D 骨骼').selectOption('upperarm_l');
+  // Stable side view at the configured 1440×960 viewport: green local rotation ring.
+  await page.mouse.move(610, 452);
+  await page.mouse.down();
+  await page.mouse.move(580, 475, { steps: 12 });
+  await page.mouse.up();
+  await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeEnabled();
+  await expect(async () => expect(await capture.screenshot()).not.toEqual(before)).toPass();
+  await page.getByRole('button', { name: '撤销姿势', exact: true }).click();
+  await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
+  await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeDisabled();
+  await page.mouse.move(610, 452);
+  await page.mouse.down();
+  await page.mouse.move(580, 475, { steps: 12 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
+  await expect(page.getByRole('button', { name: '撤销姿势', exact: true })).toBeDisabled();
+});
