@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('三个姿势和独立草稿刷新恢复、命名删除可撤销', async ({ page }, testInfo) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   const x = page.getByRole('spinbutton', { name: '位置 X' });
   await page.getByRole('tab', { name: '姿势库' }).click();
   for (const [name, value] of [
@@ -47,7 +47,7 @@ test('三个姿势和独立草稿刷新恢复、命名删除可撤销', async ({
 });
 
 test('工程备份在干净环境往返、姿势 JSON 往返、坏文件不覆盖', async ({ page, browser }) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   const x = page.getByRole('spinbutton', { name: '位置 X' });
   await x.fill('630');
   await x.press('Enter');
@@ -63,7 +63,7 @@ test('工程备份在干净环境往返、姿势 JSON 往返、坏文件不覆�
   const path = (await (await pending).path())!;
   const context = await browser.newContext();
   const clean = await context.newPage();
-  await clean.goto('/');
+  await clean.goto('/?editor=2d');
   await clean.getByLabel('选择工程文件').setInputFiles(path);
   await expect(clean.getByRole('spinbutton', { name: '位置 X' })).toHaveValue('630');
   await clean.getByRole('tab', { name: '姿势库' }).click();
@@ -89,7 +89,7 @@ test('存储失败仍可下载工程备份', async ({ page }) => {
       throw new DOMException('storage full', 'QuotaExceededError');
     };
   });
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   await expect(page.getByText(/本地保存失败/)).toBeVisible();
   const x = page.getByRole('spinbutton', { name: '位置 X' });
   await x.fill('650');

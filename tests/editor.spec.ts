@@ -6,7 +6,7 @@ import { dragBoneEndpoint } from '../src/core/rig/dragPose';
 test('编辑草稿、撤销重做和空状态', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   await expect(page.getByRole('heading', { name: '根节点' })).toBeVisible();
   await expect(page.getByTestId('pose-canvas').locator('canvas')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('editor.png'), fullPage: true });
@@ -34,7 +34,7 @@ test('编辑草稿、撤销重做和空状态', async ({ page }, testInfo) => {
 });
 
 test('整次根节点拖动仅提交一次，撤销恢复起点', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   const host = page.getByTestId('pose-canvas');
   await expect(host.locator('canvas')).toBeVisible();
   const box = (await host.boundingBox())!;
@@ -55,7 +55,7 @@ test('整次根节点拖动仅提交一次，撤销恢复起点', async ({ page 
 });
 
 test('拖动按 Esc 取消，不污染工程历史', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   const host = page.getByTestId('pose-canvas');
   await expect(host.locator('canvas')).toBeVisible();
   const box = (await host.boundingBox())!;
@@ -76,7 +76,7 @@ test('拖动按 Esc 取消，不污染工程历史', async ({ page }) => {
 
 for (const boneId of ['leftForearm', 'rightForearm', 'leftShin', 'rightShin', 'head']) {
   test(`直接拖动 ${boneId}，缩放后可操作且整次撤销`, async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?editor=2d');
     const host = page.getByTestId('pose-canvas');
     await expect(host.locator('canvas')).toBeVisible();
     const box = (await host.boundingBox())!;
@@ -111,7 +111,7 @@ for (const boneId of ['leftForearm', 'rightForearm', 'leftShin', 'rightShin', 'h
 }
 
 test('模式切换、方向翻转和角度限制', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   await page.getByRole('button', { name: /左前臂/ }).click();
   const angle = page.getByRole('spinbutton', { name: '局部旋转' });
   await page.getByRole('button', { name: 'FK', exact: true }).click();
@@ -133,7 +133,7 @@ test('模式切换、方向翻转和角度限制', async ({ page }) => {
 });
 
 test('平移视口不修改工程，平移后仍可拖动骨骼点', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   const host = page.getByTestId('pose-canvas');
   await expect(host.locator('canvas')).toBeVisible();
   const box = (await host.boundingBox())!;
@@ -158,7 +158,7 @@ test('平移视口不修改工程，平移后仍可拖动骨骼点', async ({ pa
 });
 
 test('拖动方向柄翻转肘部，并可一次撤销', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   await page.getByRole('button', { name: /左前臂/ }).click();
   const box = (await page.getByTestId('pose-canvas').boundingBox())!;
   const project = createDefaultProject();
@@ -184,7 +184,7 @@ test('拖动方向柄翻转肘部，并可一次撤销', async ({ page }) => {
 });
 
 test('站立、抬手与弓步的画布操作验收', async ({ page }, testInfo) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   const host = page.getByTestId('pose-canvas');
   await expect(host.locator('canvas')).toBeVisible();
   const box = (await host.boundingBox())!;
@@ -227,7 +227,7 @@ test('站立、抬手与弓步的画布操作验收', async ({ page }, testInfo)
 });
 
 test('侧身预设、连续转身、重置和重叠关节编辑', async ({ page }, testInfo) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   await page.getByRole('button', { name: '朝右侧身', exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: '转身角度' })).toHaveValue('90');
   await page.screenshot({ path: testInfo.outputPath('profile-right.png') });
@@ -262,7 +262,7 @@ test('侧身预设、连续转身、重置和重叠关节编辑', async ({ page 
 });
 
 test('假人肩部连接与腿根层级，以及独立显示开关', async ({ page }, testInfo) => {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.getByRole('button', { name: '骨架线', exact: true }).click();

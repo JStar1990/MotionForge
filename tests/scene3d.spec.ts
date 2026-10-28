@@ -1,0 +1,24 @@
+import { expect, test } from '@playwright/test';
+test('3D 模型、双机隔离、解锁与撤销', async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  const capture = page.getByTestId('capture-view').locator('canvas');
+  const before = await capture.screenshot();
+  await page.getByRole('button', { name: '左侧', exact: true }).click();
+  await expect(async () => expect(await capture.screenshot()).toEqual(before)).toPass();
+  await page.getByRole('button', { name: '解锁截图摄像机' }).click();
+  await page.getByRole('button', { name: '采用当前自由视角' }).click();
+  await expect(page.getByLabel('截图投影')).toHaveValue('perspective');
+  await page.getByRole('button', { name: '撤销相机调整' }).click();
+  await expect(page.getByLabel('截图投影')).toHaveValue('orthographic');
+  await page.getByRole('button', { name: '锁定截图摄像机' }).click();
+  await expect(page.getByLabel('position-0')).toBeDisabled();
+  await page.screenshot({ path: info.outputPath('scene3d.png'), fullPage: true });
+  await page.getByLabel('素体模型').selectOption('female');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  await page.getByRole('button', { name: '打开原 2D 编辑器' }).click();
+  await expect(page.getByTestId('pose-canvas')).toBeVisible();
+  expect(errors).toEqual([]);
+});

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 async function sequence(page: import('@playwright/test').Page) {
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   await page.getByRole('button', { name: '新建动作', exact: true }).click();
   for (const [name, duration, x] of [
     ['A', '3', '500'],
@@ -144,7 +144,7 @@ test('序列备份恢复、复制和删除动作可撤销', async ({ page, brows
   const path = (await (await pending).path())!;
   const context = await browser.newContext();
   const restored = await context.newPage();
-  await restored.goto('/');
+  await restored.goto('/?editor=2d');
   await restored.getByLabel('选择工程文件').setInputFiles(path);
   await restored.getByLabel('编辑目标').selectOption({ label: '动作 1' });
   await expect(restored.getByText('3 个关键姿势 / 9 个播放帧')).toBeVisible();

@@ -18,7 +18,7 @@ async function loadSequence(page: import('@playwright/test').Page, durations = [
   const zip = await new JSZip()
     .file('project.json', JSON.stringify(project))
     .generateAsync({ type: 'nodebuffer' });
-  await page.goto('/');
+  await page.goto('/?editor=2d');
   await page
     .getByLabel('选择工程文件')
     .setInputFiles({ name: 'test.motionforge', mimeType: 'application/zip', buffer: zip });

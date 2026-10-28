@@ -762,3 +762,69 @@ p {
 .export-dialog progress {
   width: 100%;
 }
+.scene3d-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.scene3d-toolbar {
+  display: flex;
+  gap: 12px;
+  padding: 10px 20px;
+}
+.scene3d-layout {
+  display: grid;
+  grid-template-columns: minmax(400px, 1fr) 370px;
+  flex: 1;
+  min-height: 0;
+}
+.scene3d-free {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.scene3d-free h3 {
+  padding: 12px 20px;
+  margin: 0;
+}
+.scene3d-host {
+  flex: 1;
+  min-height: 0;
+}
+.scene3d-settings {
+  padding: 16px;
+  overflow: auto;
+  background: #191d25;
+}
+.scene3d-capture {
+  width: 100%;
+  aspect-ratio: 1;
+  margin-bottom: 12px;
+}
+.scene3d-capture canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+.scene3d-settings fieldset {
+  border: 1px solid #39414e;
+  margin: 12px 0;
+}
+.scene3d-settings input {
+  width: 80px;
+  padding: 6px;
+  margin: 4px;
+}
+.scene3d-settings select,
+.scene3d-toolbar select {
+  padding: 7px;
+  background: #202936;
+  color: white;
+}
+.switch3d {
+  position: fixed;
+  bottom: 2px;
+  left: 260px;
+  z-index: 10;
+  padding: 3px 8px;
+  background: #263d3b;
+}
