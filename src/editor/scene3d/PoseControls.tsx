@@ -1,3 +1,4 @@
+import { jointLimits, limitDelta } from './jointLimits';
 import { useCallback, useEffect, useState } from 'react';
 import * as THREE from 'three';
 
@@ -40,27 +41,32 @@ function Angle({
   label,
   value,
   commit,
+  min,
+  max,
 }: {
   label: string;
   value: number;
+  min: number;
+  max: number;
   commit: (value: number) => void;
 }) {
   return (
     <label>
-      {label}
+      {label}（{min}°～{max}°）
       <input
         key={value}
         aria-label={label}
         type="number"
         step="5"
-        min="-180"
-        max="180"
+        min={min}
+        max={max}
         defaultValue={Number(value.toFixed(2))}
         onBlur={(event) => {
           const next = Number(event.target.value);
-          if (event.target.value.trim() && Number.isFinite(next) && Math.abs(next) <= 180)
+          if (event.target.value.trim() && Number.isFinite(next)) {
             commit(next);
-          else event.target.value = String(Number(value.toFixed(2)));
+            event.target.value = String(THREE.MathUtils.clamp(next, min, max));
+          } else event.target.value = String(Number(value.toFixed(2)));
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') event.currentTarget.blur();
@@ -84,6 +90,15 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
   const [future, setFuture] = useState<Pose[]>([]);
   const commit = useCallback(
     (next: Pose) => {
+      let limited = false;
+      next = Object.fromEntries(
+        Object.entries(next).map(([name, q]) => {
+          const result = limitDelta(name, new THREE.Quaternion(...q));
+          limited ||= result.limited;
+          return [name, result.rotation.toArray()];
+        }),
+      );
+      if (limited) setFeedback('已到关节限位，输入已限制在允许范围。');
       if (JSON.stringify(next) === JSON.stringify(pose)) return;
       setPast([...past, structuredClone(pose)].slice(-100));
       setFuture([]);
@@ -158,6 +173,10 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
         </select>
       </label>
       <button onClick={() => rig.interaction?.focus()}>聚焦选中骨骼</button>
+      <p>
+        关节限位已开启，各骨骼采用不同的默认范围。达到限位时优先保留关节范围，IK
+        目标可能无法完全到达。这些是编辑预设，尚不包含人体碰撞。
+      </p>
       <p>相对绑定姿态的局部 XYZ 旋转（度）。按 Enter 或移开焦点提交。</p>
       <select
         aria-label="选择 3D 骨骼"
@@ -176,10 +195,15 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
         <Angle
           key={selected + axis + JSON.stringify(pose[selected])}
           label={`骨骼旋转 ${axis.toUpperCase()}`}
+          min={jointLimits[selected]?.[axis][0] ?? -180}
+          max={jointLimits[selected]?.[axis][1] ?? 180}
           value={THREE.MathUtils.radToDeg(rotation[axis])}
           commit={(value) => {
             const next = rotation.clone();
-            next[axis] = THREE.MathUtils.degToRad(value);
+            const bounds = jointLimits[selected]?.[axis] ?? [-180, 180];
+            const clamped = THREE.MathUtils.clamp(value, bounds[0], bounds[1]);
+            if (clamped !== value) setFeedback('已到关节限位，输入已限制在允许范围。');
+            next[axis] = THREE.MathUtils.degToRad(clamped);
             const q = new THREE.Quaternion().setFromEuler(next).normalize();
             commit({ ...pose, [selected]: q.toArray() });
           }}
@@ -214,7 +238,7 @@ export function PoseControls({ rig }: { rig: BoneRig }) {
       </div>
       <p className="warning">
         姿势暂不保存；刷新、切换素体或返回 2D 将清除本次 3D 编辑。手脚平移已接入基础
-        IK；支持肘膝方向调整；关节限制与整人平移尚未接入。
+        IK；支持肘膝方向调整与关节限位；整人平移尚未接入。
       </p>
     </section>
   );

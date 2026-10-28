@@ -1,3 +1,4 @@
+import { limitBone } from './jointLimits';
 import { initialPole, limbChains, solveLimb } from './limbIK';
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
@@ -85,6 +86,13 @@ export class BoneInteraction {
       if (!this.before) return;
       if (this.mode !== 'rotate' || this.cancelled) this.restore();
       if (this.cancelled) return;
+      if (this.mode === 'rotate') {
+        const bone = this.rig.bones.get(this.selected)!;
+        const limited = limitBone(bone, this.rig.rest.get(this.selected)!);
+        this.onFeedback?.(
+          limited ? '已到关节限位，旋转已限制在允许范围。' : '拖动旋转环调整骨骼。',
+        );
+      }
       if (this.mode !== 'rotate') {
         const chain = this.chain();
         if (chain) {
@@ -95,17 +103,23 @@ export class BoneInteraction {
             if (offset.addScaledVector(axis, -offset.dot(axis)).lengthSq() > 1e-6)
               this.pole.copy(this.target.position);
           }
+          let limited = false;
           const error = solveLimb(
             ...chain,
             this.mode === 'pole' ? this.goal : this.target.position,
             this.pole,
+            (bone) => {
+              limited = limitBone(bone, this.rig.rest.get(bone.name)!) || limited;
+            },
           );
           this.onFeedback?.(
-            error > 0.005
-              ? '目标超出可达范围，已保持骨长并停在可达位置。'
-              : this.mode === 'pole'
-                ? '正在调整肘膝弯曲方向，手脚位置保持。'
-                : '拖动手脚目标：四肢跟随，骨长保持不变。',
+            limited
+              ? '已到关节限位；优先保持关节范围，手脚位置或朝向可能偏离目标。'
+              : error > 0.005
+                ? '目标超出可达范围，已保持骨长并停在可达位置。'
+                : this.mode === 'pole'
+                  ? '正在调整肘膝弯曲方向，手脚位置保持。'
+                  : '拖动手脚目标：四肢跟随，骨长保持不变。',
           );
         }
       }

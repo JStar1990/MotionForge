@@ -172,3 +172,28 @@ test('肘膝方向控件', async ({ page }, info) => {
   await page.getByRole('button', { name: '重做姿势', exact: true }).click();
   await expect(async () => expect(await capture.screenshot()).not.toEqual(bent)).toPass();
 });
+
+test('不同关节限位、超限输入与撤销', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('status')).toContainText('模型已加载');
+  const x = page.getByLabel('骨骼旋转 X', { exact: true });
+  await page.getByLabel('选择 3D 骨骼').selectOption('lowerarm_l');
+  await expect(x).toHaveAttribute('min', '0');
+  await expect(x).toHaveAttribute('max', '145');
+  await x.fill('170');
+  await x.press('Enter');
+  await expect(x).toHaveValue('145');
+  await expect(page.getByTestId('bone-feedback')).toContainText('限位');
+  await page.getByRole('button', { name: '撤销姿势', exact: true }).click();
+  await expect(x).toHaveValue('0');
+  await page.getByLabel('选择 3D 骨骼').selectOption('calf_r');
+  await expect(x).toHaveAttribute('max', '150');
+  await x.fill('-90');
+  await x.press('Enter');
+  await expect(x).toHaveValue('0');
+  await page.getByLabel('选择 3D 骨骼').selectOption('spine_01');
+  await expect(x).toHaveAttribute('max', '35');
+  await x.fill('80');
+  await x.press('Enter');
+  await expect(x).toHaveValue('35');
+});

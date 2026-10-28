@@ -28,6 +28,7 @@ export function solveLimb(
   end: THREE.Bone,
   target: THREE.Vector3,
   pole: THREE.Vector3,
+  constrain?: (bone: THREE.Bone) => void,
 ) {
   const a = world(upper),
     b = world(lower),
@@ -56,10 +57,15 @@ export function solveLimb(
   const goal = a.clone().addScaledVector(direction, reach);
   const orientation = end.getWorldQuaternion(new THREE.Quaternion());
   aim(upper, lower, elbow);
+  constrain?.(upper);
+  upper.updateWorldMatrix(false, true);
   aim(lower, end, goal);
+  constrain?.(lower);
+  lower.updateWorldMatrix(false, true);
   end.quaternion
     .copy(end.parent!.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(orientation))
     .normalize();
+  constrain?.(end);
   end.updateWorldMatrix(false, true);
   return world(end).distanceTo(target);
 }

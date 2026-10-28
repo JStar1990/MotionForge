@@ -1,3 +1,4 @@
+import { limitBone, limitDelta } from './jointLimits';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
@@ -66,6 +67,21 @@ describe.each(['male', 'female'])('IK on shipped %s skeleton', (model) => {
           expect(bone.quaternion.toArray().every(Number.isFinite)).toBe(true);
         });
       });
+      for (const target of targets) {
+        [upper, lower, end].forEach((bone, i) => bone.quaternion.copy(originals[i].q));
+        const error = solveLimb(upper, lower, end, target, pole, (bone) => {
+          const index = [upper, lower, end].indexOf(bone);
+          limitBone(bone, originals[index].q);
+        });
+        expect(Number.isFinite(error)).toBe(true);
+        expect(world(upper).distanceTo(world(lower))).toBeCloseTo(lengths[0], 5);
+        expect(world(lower).distanceTo(world(end))).toBeCloseTo(lengths[1], 5);
+        [upper, lower, end].forEach((bone, i) => {
+          const delta = originals[i].q.clone().invert().multiply(bone.quaternion);
+          expect(limitDelta(bone.name, delta).limited).toBe(false);
+          expect(bone.position.toArray()).toEqual(originals[i].p.toArray());
+        });
+      }
     });
   }
 });
